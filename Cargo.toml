@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 druid = "0.7.0"
+druid-shell = "0.7.0"
 clap = "2.33.3"

@@ -1,5 +1,7 @@
+#![allow(dead_code)]
+
 use std::io::{self, BufRead};
-use std::process;
+use std::process::{self, Command};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{self, Duration, SystemTime};
@@ -62,10 +64,8 @@ fn watch_dbus(tx: mpsc::Sender<DBusEvent>) -> thread::JoinHandle<()> {
             let mut line = String::new();
             reader.read_line(&mut line).unwrap();
             if let Some(event) = parse_dbus_line(&line) {
-                println!("Event={:?}", event);
                 tx.send(event).unwrap();
             }
-            println!("{}", line);
         }
     })
 }
@@ -75,7 +75,7 @@ use std::rc::Rc;
 use druid::commands::SHOW_WINDOW;
 use druid::widget::{Button, Controller, Either, Flex, Label, LabelText};
 use druid::{
-    AppLauncher, Data, Env, Event, EventCtx, PlatformError, TimerToken, Widget, WidgetExt,
+    AppLauncher, Color, Data, Env, Event, EventCtx, Point, Size, TimerToken, Widget, WidgetExt,
     WindowDesc,
 };
 
@@ -83,26 +83,44 @@ fn make_label<T: Data>(f: impl Into<LabelText<T>>) -> impl Widget<T> {
     Label::new(f).padding(5.0).center()
 }
 
-fn ui_builder() -> impl Widget<AppState> {
-    let button = Button::new(|data: &AppState, _env: &_| {
-        format!("Snooze {}", format_time(data.snooze_duration))
-    })
-    .on_click(|_ctx, data: &mut AppState, _env| data.snooze())
-    .padding(5.0);
+fn expand(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
+    data.collapsed = false;
+    data.collapsed_window_pos = ctx.window().get_position();
+    ctx.window().set_size(EXPANDED_SIZE);
+}
+fn collapse(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
+    data.collapsed = true;
+    ctx.window().set_size(COLLAPSED_SIZE);
+    ctx.window().set_position(data.collapsed_window_pos);
+}
 
-    let button = Either::new(
+static COLLAPSED_BACKGROUND: Color = Color::rgb8(10, 147, 150);
+static SNOOZED_BACKGROUND: Color = Color::rgb8(174, 32, 18);
+static COLLAPSED_BORDER: Color = Color::rgb8(0, 18, 25);
+
+fn snooze(ctx: &mut EventCtx, data: &mut AppState, env: &Env) {
+    data.snooze();
+    collapse(ctx, data, env);
+}
+fn ui_collapsed() -> impl Widget<AppState> {
+    Label::new(|data: &AppState, _env: &_| format_time(data.remaining()))
+        .padding(5.0)
+        .center()
+        .on_click(expand)
+        .background(COLLAPSED_BACKGROUND.clone())
+}
+fn ui_expanded() -> impl Widget<AppState> {
+    let buttons = Either::new(
         |data: &AppState, _env: &_| data.is_past_due(),
-        button,
-        Label::new(""),
+        Button::new(|data: &AppState, _env: &_| {
+            format!("Snooze {}", format_time(data.snooze_duration))
+        })
+        .on_click(snooze)
+        .padding(5.0),
+        Button::new("Collapse").on_click(collapse).padding(5.0),
     );
 
     Flex::column()
-        .with_child(make_label(|data: &AppState, _env: &_| {
-            format!("Duration: {}", format_time(data.timer_duration),)
-        }))
-        .with_child(make_label(|data: &AppState, _env: &_| {
-            format!("Remaining: {}", format_time(data.remaining()),)
-        }))
         .with_child(
             Label::new(|data: &AppState, _env: &_| {
                 format!("{} since you sat down", format_time(data.elapsed()))
@@ -110,8 +128,22 @@ fn ui_builder() -> impl Widget<AppState> {
             .padding(5.0)
             .center(),
         )
-        .with_child(button)
-        .controller(UpdateEvent::new())
+        .with_child(make_label(|data: &AppState, _env: &_| {
+            format!("Duration: {}", format_time(data.timer_duration),)
+        }))
+        .with_child(make_label(|data: &AppState, _env: &_| {
+            format!("Remaining: {}", format_time(data.remaining()),)
+        }))
+        .with_child(buttons)
+}
+
+fn ui_builder() -> impl Widget<AppState> {
+    Either::new(
+        |data, _env: &_| data.collapsed,
+        ui_collapsed(),
+        ui_expanded(),
+    )
+    .controller(UpdateEvent::new())
 }
 
 struct UpdateEvent {
@@ -139,15 +171,26 @@ impl<W: Widget<AppState>> Controller<AppState, W> for UpdateEvent {
             Event::WindowConnected => {
                 // Start the timer when the application launches
                 self.timer_id = ctx.request_timer(self.timer_interval);
+                ctx.window().set_position(Point::ZERO);
+                ctx.window().set_size(EXPANDED_SIZE);
+                ctx.request_layout()
             }
             Event::Timer(id) => {
                 if *id == self.timer_id {
                     ctx.request_layout();
                     self.timer_id = ctx.request_timer(self.timer_interval);
                     data.count += 1;
-                    data.update();
+                    if let Ok(event) = data.dbus_receiver.try_recv() {
+                        if event.member == "WakeUpScreen" {
+                            data.last_event = event;
+                            data.last_snooze = None;
+                        }
+                    }
                     if data.is_past_due() {
-                        ctx.submit_command(SHOW_WINDOW)
+                        if data.collapsed {
+                            expand(ctx, data, env);
+                        }
+                        ctx.submit_command(SHOW_WINDOW);
                     }
                 }
             }
@@ -157,6 +200,9 @@ impl<W: Widget<AppState>> Controller<AppState, W> for UpdateEvent {
         child.event(ctx, event, data, env)
     }
 }
+
+static COLLAPSED_SIZE: Size = Size::new(200.0, 30.0);
+static EXPANDED_SIZE: Size = Size::new(500.0, 500.0);
 
 #[derive(Data, Clone)]
 struct AppState {
@@ -174,6 +220,9 @@ struct AppState {
 
     #[data(same_fn = "PartialEq::eq")]
     snooze_duration: Duration,
+
+    collapsed: bool,
+    collapsed_window_pos: Point,
 }
 impl AppState {
     fn new(rx: mpsc::Receiver<DBusEvent>) -> AppState {
@@ -184,6 +233,8 @@ impl AppState {
             timer_duration: Duration::new(30 * 60, 0),
             last_snooze: None,
             snooze_duration: Duration::new(5 * 60, 0),
+            collapsed: false,
+            collapsed_window_pos: Point::ZERO,
         }
     }
     fn with_duration(mut self, seconds: u64) -> AppState {
@@ -194,16 +245,11 @@ impl AppState {
         self.snooze_duration = Duration::new(seconds, 0);
         self
     }
-    fn update(&mut self) {
-        if let Ok(event) = self.dbus_receiver.try_recv() {
-            if event.member == "WakeUpScreen" {
-                self.last_event = event;
-                self.last_snooze = None;
-            }
-        }
-    }
     fn snooze(&mut self) {
         self.last_snooze = Some(SystemTime::now());
+    }
+    fn is_snoozing(&self) -> bool {
+        self.last_snooze.is_some()
     }
 
     fn is_past_due(&self) -> bool {
@@ -230,7 +276,7 @@ impl AppState {
     }
 }
 
-fn main() -> Result<(), PlatformError> {
+fn main() {
     use clap::{App, Arg};
     let matches = App::new("Timer")
         .arg(
@@ -247,7 +293,7 @@ fn main() -> Result<(), PlatformError> {
         )
         .get_matches();
 
-    let get_seconds = |name: &str| {
+    let get_seconds = move |name: &str| {
         matches
             .value_of(name)
             .unwrap()
@@ -258,11 +304,27 @@ fn main() -> Result<(), PlatformError> {
 
     let (tx, rx) = mpsc::channel();
     watch_dbus(tx);
-    let main_window = WindowDesc::new(ui_builder).title("Timer");
-    let data = AppState::new(rx)
-        .with_duration(get_seconds("duration"))
-        .with_snooze(get_seconds("snooze"));
-    AppLauncher::with_window(main_window)
-        .use_simple_logger()
-        .launch(data)
+
+    let ui_handle = thread::spawn(move || {
+        let main_window = WindowDesc::new(ui_builder)
+            .title("SitTimer")
+            .show_titlebar(false)
+            .with_min_size(Size::new(0.0, 0.0));
+        let data = AppState::new(rx)
+            .with_duration(get_seconds("duration"))
+            .with_snooze(get_seconds("snooze"));
+        AppLauncher::with_window(main_window)
+            .use_simple_logger()
+            .launch(data)
+            .unwrap();
+    });
+
+    thread::sleep(Duration::from_millis(500));
+    Command::new("wmctrl")
+        .args(vec!["-r", "SitTimer", "-b", "toggle,above", "-v"])
+        .stdout(process::Stdio::piped())
+        .spawn()
+        .expect("wmctrl failed");
+
+    ui_handle.join().unwrap();
 }
