@@ -307,7 +307,7 @@ fn main() {
 
     let ui_handle = thread::spawn(move || {
         let main_window = WindowDesc::new(ui_builder)
-            .title("SitTimer")
+            .title("sitter")
             .show_titlebar(false)
             .with_min_size(Size::new(0.0, 0.0));
         let data = AppState::new(rx)
@@ -321,7 +321,7 @@ fn main() {
 
     thread::sleep(Duration::from_millis(500));
     Command::new("wmctrl")
-        .args(vec!["-r", "SitTimer", "-b", "toggle,above", "-v"])
+        .args(vec!["-r", "sitter", "-b", "toggle,above", "-v"])
         .stdout(process::Stdio::piped())
         .spawn()
         .expect("wmctrl failed");

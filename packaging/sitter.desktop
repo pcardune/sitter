@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=sitter
+Version=1.0
+Type=Application
+Terminal=false
+Exec="/usr/bin/sitter"
+StartupWMClass=sitter
+Icon=sitter

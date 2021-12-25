@@ -622,15 +622,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gnome-wakeup-timer"
-version = "0.1.0"
-dependencies = [
- "clap",
- "druid",
- "druid-shell",
-]
-
-[[package]]
 name = "gobject-sys"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1127,6 +1118,15 @@ dependencies = [
  "atty",
  "log",
  "winapi",
+]
+
+[[package]]
+name = "sitter"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "druid",
+ "druid-shell",
 ]
 
 [[package]]

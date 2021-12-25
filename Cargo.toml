@@ -1,11 +1,33 @@
 [package]
-name = "gnome-wakeup-timer"
+name = "sitter"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
+authors = ["Paul Carduner <paul@carduner.net>"]
+description = "A simple gnome desktop app to keep you from sitting for too long."
+readme = "README.md"
+repository = "https://github.com/pcardune/sitter/"
+homepage = "https://github.com/pcardune/sitter/"
 
 [dependencies]
 druid = "0.7.0"
 druid-shell = "0.7.0"
 clap = "2.33.3"
+
+[package.metadata.deb]
+extended-description = """\
+A simple gnome desktop app to keep you from sitting at your computer
+for too long."""
+section = "utility"
+priority = "optional"
+assets = [
+  ["target/release/sitter", "usr/bin/sitter", "755"],
+  ["packaging/icon32x32.png", "usr/share/icons/hicolor/32x32/apps/sitter.png", "644"],
+  ["packaging/icon64x64.png", "usr/share/icons/hicolor/64x64/apps/sitter.png", "644"],
+  ["packaging/icon256x256.png", "usr/share/icons/hicolor/256x256/apps/sitter.png", "644"],
+  ["packaging/icon512x512.png", "usr/share/icons/hicolor/512x512/apps/sitter.png", "644"],
+  ["packaging/icon.svg", "usr/share/icons/hicolor/scalable/apps/sitter.svg", "644"],
+  ["packaging/sitter.desktop", "usr/share/application/sitter.desktop", "644"],
+  ["README.md", "usr/share/doc/sitter/README.md", "644"],
+]
+maintainer-scripts = "packaging/maintainer-scripts"

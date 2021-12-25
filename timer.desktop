@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=gnome-wakeup-timer
-Version=1.0
-Type=Application
-Terminal=false
-Exec="/home/pcardune/programming/pcardune/gnome-wakeup-timer/target/release/gnome-wakeup-timer"
-StartupWMClass=gnome-wakeup-timer
-Icon=gnome-wakeup-timer

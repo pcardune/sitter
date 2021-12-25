@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+
+# install desktop file
+desktop-file-install /usr/share/application/sitter.desktop
+update-desktop-database
