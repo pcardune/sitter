@@ -31,3 +31,4 @@ assets = [
   ["README.md", "usr/share/doc/sitter/README.md", "644"],
 ]
 maintainer-scripts = "packaging/maintainer-scripts"
+depends = "wmctrl"
