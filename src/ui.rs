@@ -10,6 +10,12 @@ use druid::{Color, Data, Env, Event, EventCtx, Point, Size, TimerToken, Widget, 
 
 use crate::dbus;
 
+static COLLAPSED_BACKGROUND: Color = Color::rgb8(10, 147, 150);
+static EXPANDED_BACKGROUND: Color = Color::rgb8(174, 32, 18);
+static COLLAPSED_BORDER: Color = Color::rgb8(0, 18, 25);
+static COLLAPSED_SIZE: Size = Size::new(200.0, 30.0);
+static EXPANDED_SIZE: Size = Size::new(500.0, 500.0);
+
 fn format_time(d: Duration) -> String {
     let secs = d.as_secs();
     if secs < 60 {
@@ -33,10 +39,6 @@ fn collapse(ctx: &mut EventCtx, data: &mut AppState, _env: &Env) {
     ctx.window().set_size(COLLAPSED_SIZE);
     ctx.window().set_position(data.collapsed_window_pos);
 }
-
-static COLLAPSED_BACKGROUND: Color = Color::rgb8(10, 147, 150);
-static SNOOZED_BACKGROUND: Color = Color::rgb8(174, 32, 18);
-static COLLAPSED_BORDER: Color = Color::rgb8(0, 18, 25);
 
 fn snooze(ctx: &mut EventCtx, data: &mut AppState, env: &Env) {
     data.snooze();
@@ -75,6 +77,7 @@ fn ui_expanded() -> impl Widget<AppState> {
             format!("Remaining: {}", format_time(data.remaining()),)
         }))
         .with_child(buttons)
+        .background(EXPANDED_BACKGROUND.clone())
 }
 
 pub fn root() -> impl Widget<AppState> {
@@ -140,9 +143,6 @@ impl<W: Widget<AppState>> Controller<AppState, W> for UpdateEvent {
         child.event(ctx, event, data, env)
     }
 }
-
-static COLLAPSED_SIZE: Size = Size::new(200.0, 30.0);
-static EXPANDED_SIZE: Size = Size::new(500.0, 500.0);
 
 #[derive(Data, Clone)]
 pub struct AppState {
