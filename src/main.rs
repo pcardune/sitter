@@ -62,7 +62,14 @@ fn main() {
 
     thread::sleep(Duration::from_millis(500));
     Command::new("wmctrl")
-        .args(vec!["-r", "sitter", "-b", "toggle,above", "-v"])
+        .args(vec![
+            "-r",
+            "sitter.Sitter",
+            "-x",
+            "-b",
+            "toggle,above",
+            "-v",
+        ])
         .stdout(Stdio::piped())
         .spawn()
         .expect("wmctrl failed");
