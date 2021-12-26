@@ -7,6 +7,7 @@ mod dbus;
 mod ui;
 
 use std::process::{Command, Stdio};
+use std::str::from_utf8;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -60,14 +61,28 @@ fn main() {
             .unwrap();
     });
 
-    thread::sleep(Duration::from_millis(500));
+    loop {
+        let cmd = Command::new("wmctrl")
+            .args(vec!["-l", "-x", "-p"])
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("wmctrl failed")
+            .wait_with_output()
+            .expect("Failed to wait on child");
+        let stdout = from_utf8(&cmd.stdout).unwrap();
+        if stdout.contains("sitter.Sitter") {
+            break;
+        }
+        thread::sleep(Duration::from_millis(500));
+    }
+
     Command::new("wmctrl")
         .args(vec![
             "-r",
             "sitter.Sitter",
             "-x",
             "-b",
-            "toggle,above",
+            "add,above,sticky",
             "-v",
         ])
         .stdout(Stdio::piped())
